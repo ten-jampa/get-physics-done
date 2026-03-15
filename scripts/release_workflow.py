@@ -16,7 +16,7 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -63,7 +63,7 @@ def _replace_once(
 
 
 def current_release_date() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return datetime.now(UTC).date().isoformat()
 
 
 def _validate_release_date(release_date: str) -> str:
