@@ -235,7 +235,7 @@ Passing a manuscript path to a project-required command such as `/gpd:peer-revie
 The full command reference below uses Claude Code / Gemini CLI syntax. Codex uses `$gpd-...` and OpenCode uses `/gpd-...`.
 
 <details>
-<summary><strong>Full Command Reference (61 Commands)</strong></summary>
+<summary><strong>Full Command Reference (62 Commands)</strong></summary>
 
 #### Project Initialization
 
@@ -302,6 +302,7 @@ The full command reference below uses Claude Code / Gemini CLI syntax. Codex use
 | Command | What it does |
 |---------|--------------|
 | `/gpd:explain [concept]` | Explain a physics concept rigorously in the context of the active project or standalone question |
+| `/gpd:learn [concept] [--type recall\|derive\|apply]` | Feynman learning loop — challenge, attempt, assess, teach gaps, re-attempt until mastery |
 
 #### Session Management
 
@@ -411,6 +412,56 @@ The full command reference below uses Claude Code / Gemini CLI syntax. Codex use
 For full per-command detail and examples inside your runtime, run `/gpd:help --all` or the equivalent runtime-specific help command.
 
 </details>
+
+## Learning Engine
+
+GPD includes a Feynman-style active recall system based on the principle: *"What I cannot create, I do not understand."*
+
+The `learn` command runs a mastery-bounded loop:
+
+```text
+/gpd:learn "Ward identity" --type derive
+```
+
+**How it works:**
+
+1. **Challenge** — a `gpd-tutor` agent generates a calibrated physics challenge (recall, derive, or apply)
+2. **Attempt** — you submit your work inline or by file reference
+3. **Assess** — a `gpd-mastery-assessor` independently verifies your work and assigns a mastery level (0–4)
+4. **Teach gaps** — if below mastery, `gpd-explainer` teaches the specific gaps identified
+5. **Re-attempt** — the loop repeats with challenges refocused on your weak areas
+6. **Mastery** — the loop ends when you reach Level 3 (Understanding) or higher
+
+**Mastery levels:**
+
+| Level | Name | What it means |
+|-------|------|---------------|
+| 0 | Incomplete | Did not finish or skipped |
+| 1 | Recall | Can state the result but not derive it |
+| 2 | Mechanical | Can follow steps but can't explain WHY each works |
+| 3 | Understanding | Can derive AND articulate physical meaning, assumptions, limitations |
+| 4 | Fluency | Can derive, explain, AND transfer to related problems |
+
+The critical boundary is Level 2 → 3: correct computation vs. genuine understanding.
+
+All session artifacts (challenges, assessments, explanations) are saved in `.gpd/learning/` with an append-only learning log for tracking progress over time.
+
+## Local Development
+
+To develop GPD locally and test changes to commands, agents, or workflows:
+
+```bash
+uv sync --dev              # Install dependencies
+uv build                   # Build the package
+uv run ruff check .        # Lint (must pass)
+uv run pytest tests/ -v    # Run tests
+
+# Reinstall locally for your runtime (picks up new/changed files)
+npx -y get-physics-done --claude --local --reinstall
+npx -y get-physics-done --codex --local --reinstall
+```
+
+Local installs go to `./.claude/` or `./.codex/` (project-scoped) and take precedence over global installs at `~/.claude/` or `~/.codex/`. Restart your runtime after reinstalling to pick up changes.
 
 ## Optional: Model Profiles And Tier Overrides
 
