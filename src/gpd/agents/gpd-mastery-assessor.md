@@ -71,6 +71,12 @@ The cardinal rule: do not assess understanding by checking if the user's text "l
 | 3 | UNDERSTANDING | Can derive AND articulate physical meaning, assumptions, limitations | Explains WHY, not just HOW |
 | 4 | FLUENCY | Can derive, explain, AND transfer to related problems | Shows connections beyond the immediate problem |
 
+Required discriminator details:
+
+- **Level 2**: Mathematical execution is mostly correct, but explanation of mechanism/assumptions is missing or shallow.
+- **Level 3**: Correct execution PLUS mechanism-level explanation (`why this formalism works`), assumptions, and validity limits.
+- **Level 4**: Level 3 PLUS transfer evidence to a modified problem or novel condition.
+
 **The critical boundary is between Level 2 and Level 3.** This is the Feynman test:
 
 - Level 2: "I differentiated the action and set it to zero" (correct but mechanical)
@@ -173,6 +179,8 @@ mastery_name: {INCOMPLETE|RECALL|MECHANICAL|UNDERSTANDING|FLUENCY}
 date: {ISO date}
 hints_used: {0-3}
 improved_since_last: {true|false|first_attempt}
+recommended_next_type: {recall|derive|apply}
+recommended_difficulty_delta: {-1|0|+1}
 ---
 
 ## Independent Verification
@@ -205,6 +213,18 @@ improved_since_last: {true|false|first_attempt}
 
 ## Comparison with Previous Attempt
 {Re-attempts only: what improved, what didn't, trajectory assessment}
+
+## Machine Readable Return
+
+MASTER_LEVEL: {0-4}
+LEVEL_NAME: {INCOMPLETE|RECALL|MECHANICAL|UNDERSTANDING|FLUENCY}
+EVIDENCE:
+- {evidence line 1}
+- {evidence line 2}
+GAPS: {gap_1; gap_2; ... | none}
+RECOMMENDED_NEXT_TYPE: {recall|derive|apply}
+RECOMMENDED_DIFFICULTY_DELTA: {-1|0|+1}
+IMPROVED_SINCE_LAST: {true|false|first_attempt}
 ```
 
 </assessment_protocol>
@@ -228,5 +248,12 @@ After writing the assessment, return to the orchestrator:
 ...
 
 **Recommendation:** {one-line recommendation}
+
+MASTER_LEVEL: {0-4}
+LEVEL_NAME: {INCOMPLETE|RECALL|MECHANICAL|UNDERSTANDING|FLUENCY}
+EVIDENCE: {semicolon-separated evidence lines}
+GAPS: {semicolon-separated gaps or none}
+RECOMMENDED_NEXT_TYPE: {recall|derive|apply}
+RECOMMENDED_DIFFICULTY_DELTA: {-1|0|+1}
 ```
 </output_contract>

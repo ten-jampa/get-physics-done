@@ -86,6 +86,25 @@ attempt_number = 1
 previous_level = null
 previous_gaps = []
 consecutive_plateau = 0
+difficulty_level = 2
+score_history = []
+gap_history = []
+session_file = .gpd/learning/{slug}-SESSION.json
+```
+
+Initialize or load `.gpd/learning/{slug}-SESSION.json` so re-attempt routing is deterministic across pauses:
+
+```json
+{
+  "concept": "{concept}",
+  "current_type": "{type}",
+  "difficulty_level": 2,
+  "attempt_number": 1,
+  "score_history": [],
+  "gap_history": [],
+  "plateau_count": 0,
+  "status": "active"
+}
 ```
 
 ### Step 5a: Spawn Tutor — Generate Challenge, Collect Attempt
@@ -108,6 +127,8 @@ Generate a physics challenge and collect the user's attempt.
 <context>
 - Concept: {concept}
 - Challenge type: {type}
+- Difficulty level (1-5): {difficulty_level}
+- Challenge focus: multi-gap
 - Attempt number: {attempt_number}
 - Project conventions: {conventions or "none — use standard notation"}
 - Challenge file: .gpd/learning/{slug}-CHALLENGE.md
@@ -115,10 +136,17 @@ Generate a physics challenge and collect the user's attempt.
 
 <requirements>
 1. Design a {type} challenge for "{concept}" calibrated to 5-15 minutes.
-2. Present it to the user and collect their attempt.
-3. Write the challenge spec and attempt to .gpd/learning/{slug}-CHALLENGE.md
-4. Follow the hint policy if the user asks for help (3 escalating hints, never the answer).
-5. If the user says "pause" or "stop", acknowledge and return.
+2. Calibrate complexity to difficulty level {difficulty_level} on this scale:
+   - 1: direct reconstruction from explicit premises
+   - 2: one non-trivial inference step
+   - 3: light variation/perturbation
+   - 4: transfer to a changed assumption or boundary condition
+   - 5: transfer + justification of assumption changes
+3. Explicitly include `target_gaps=[]` for attempt 1.
+4. Present it to the user and collect their attempt.
+5. Write the challenge spec and attempt to .gpd/learning/{slug}-CHALLENGE.md
+6. Follow the hint policy if the user asks for help (3 escalating hints, never the answer).
+7. If the user says "pause" or "stop", acknowledge and return.
 </requirements>
 ```
 
@@ -132,6 +160,8 @@ Generate a refocused challenge targeting specific gaps and collect the user's at
 <context>
 - Concept: {concept}
 - Challenge type: {type}
+- Difficulty level (1-5): {difficulty_level}
+- Challenge focus: {single-gap if regression else multi-gap}
 - Attempt number: {attempt_number}
 - Prior mastery level: {previous_level}
 - Prior gaps: {previous_gaps}
@@ -141,11 +171,13 @@ Generate a refocused challenge targeting specific gaps and collect the user's at
 
 <requirements>
 1. Design a {type} challenge for "{concept}" that specifically targets these gaps: {previous_gaps}
-2. Keep the same core concept but refocus to test the weak areas.
-3. Present it to the user and collect their attempt.
-4. Append the new attempt to .gpd/learning/{slug}-CHALLENGE.md
-5. Follow the hint policy if the user asks for help.
-6. If the user says "pause" or "stop", acknowledge and return.
+2. Include `target_gaps` explicitly and prioritize only the first gap when `challenge_focus=single-gap`.
+3. Keep the same core concept but refocus to test the weak areas.
+4. Calibrate complexity to difficulty level {difficulty_level} using the same 1-5 ladder.
+5. Present it to the user and collect their attempt.
+6. Append the new attempt to .gpd/learning/{slug}-CHALLENGE.md
+7. Follow the hint policy if the user asks for help.
+8. If the user says "pause" or "stop", acknowledge and return.
 </requirements>
 ```
 
@@ -191,7 +223,14 @@ Assess the user's physics work for correctness, understanding, and mastery level
 4. Assess understanding depth (WHY vs HOW — the Level 2/3 discriminator).
 5. Assign mastery level 0-4 with justification.
 6. Identify specific gaps with concrete descriptions.
-7. Write assessment to .gpd/learning/{slug}-ASSESSMENT-{attempt_number}.md
+7. Emit required machine-readable fields in both frontmatter and return block:
+   - `MASTER_LEVEL` (0-4)
+   - `LEVEL_NAME`
+   - `EVIDENCE` (concise bullet list)
+   - `GAPS`
+   - `RECOMMENDED_NEXT_TYPE` (recall|derive|apply)
+   - `RECOMMENDED_DIFFICULTY_DELTA` (-1|0|+1)
+8. Write assessment to .gpd/learning/{slug}-ASSESSMENT-{attempt_number}.md
 </requirements>
 ```
 
@@ -205,7 +244,13 @@ task(
 )
 ```
 
-Parse the assessor's return: `mastery_level`, `gaps`, `improved_since_last`.
+Parse the assessor's return:
+- `MASTER_LEVEL`
+- `LEVEL_NAME`
+- `GAPS`
+- `RECOMMENDED_NEXT_TYPE`
+- `RECOMMENDED_DIFFICULTY_DELTA`
+- `IMPROVED_SINCE_LAST`
 
 ### Step 5c: Mastery Check (Orchestrator Logic — No Agent Spawn)
 
@@ -216,6 +261,7 @@ Evaluate the assessment result:
 if mastery_level >= 3:
     → Display celebration message
     → Show assessment highlights
+    → session.status = "mastered"
     → Jump to update_learning_log with status=mastered
 ```
 
@@ -223,35 +269,47 @@ if mastery_level >= 3:
 ```
 if mastery_level > previous_level:
     consecutive_plateau = 0
+    difficulty_level = min(5, difficulty_level + 1)
+    if recommended_next_type is valid and recommended_next_type != type:
+        type = recommended_next_type
     → "Improving! Level {previous_level} → {mastery_level}."
-    → "Gap remaining: {primary_gap}. Let's close it."
+    → "Gap remaining: {primary_gap}. Increasing difficulty to {difficulty_level}."
     → Continue to Step 5d
 ```
 
-**Plateau detected:**
+**Single plateau (same level once):**
 ```
 if mastery_level == previous_level:
     consecutive_plateau += 1
-    if consecutive_plateau >= 2:
-        → "Plateau detected — same level for {consecutive_plateau} attempts."
-        → "Options:"
-        →   "1. Try a different challenge type (currently: {type})"
-        →   "2. Pause and study first: /gpd:explain \"{concept}\""
-        →   "3. Try once more"
-        → Ask user which option (ask_user)
-        → If option 1: change type, reset plateau counter, continue to 5a
-        → If option 2: jump to update_learning_log with status=plateau
-        → If option 3: continue to 5d
-    else:
-        → "Same level as last attempt. Let's try a different angle."
+    if consecutive_plateau == 1:
+        → "Same level as last attempt. Keep difficulty at {difficulty_level}, refocus on primary gap."
         → Continue to Step 5d
+```
+
+**Repeated plateau (same level at least twice):**
+```
+if mastery_level == previous_level and consecutive_plateau >= 2:
+    difficulty_level = max(1, difficulty_level - 1)
+    if type == "derive":
+        type = "apply"
+    elif type == "apply":
+        type = "derive"
+    elif type == "recall":
+        type = "derive"
+    consecutive_plateau = 0
+    → "Plateau detected — switching challenge type to {type} and reducing difficulty to {difficulty_level}."
+    → Continue to Step 5d
 ```
 
 **Regression:**
 ```
 if mastery_level < previous_level:
+    difficulty_level = max(1, difficulty_level - 1)
+    challenge_focus = "single-gap"
+    if recommended_next_type is valid and recommended_next_type != type:
+        type = recommended_next_type
     → "Level dropped from {previous_level} to {mastery_level}."
-    → "This sometimes happens — let's refocus."
+    → "Reducing difficulty to {difficulty_level} and isolating one gap."
     → Continue to Step 5d
 ```
 
@@ -261,7 +319,17 @@ Update loop state:
 ```
 previous_level = mastery_level
 previous_gaps = gaps
+score_history.append(mastery_level)
+gap_history.append(gaps)
 attempt_number += 1
+write session_file:
+  current_type = type
+  difficulty_level = difficulty_level
+  attempt_number = attempt_number
+  score_history = score_history
+  gap_history = gap_history
+  plateau_count = consecutive_plateau
+  status = "active"
 ```
 
 ### Step 5d: Spawn Explainer — Teach Specific Gaps
@@ -339,7 +407,8 @@ Append to `.gpd/learning/LEARNING-LOG.md`:
 - **Gaps closed:** {list of gaps that were resolved across attempts}
 - **Gaps remaining:** {list or "none"}
 - **Status:** mastered | paused | plateau
-- **Files:** {slug}-CHALLENGE.md, ASSESSMENT-1..{N}, EXPLANATION-1..{N}
+- **Difficulty journey:** {difficulty_1} → ... → {difficulty_N}
+- **Files:** {slug}-SESSION.json, {slug}-CHALLENGE.md, ASSESSMENT-1..{N}, EXPLANATION-1..{N}
 ```
 
 If the file doesn't exist yet, create it with a header:

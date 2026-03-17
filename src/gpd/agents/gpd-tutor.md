@@ -129,6 +129,9 @@ From the orchestrator prompt, extract:
 - **Concept:** What physics concept to challenge on
 - **Type:** recall, derive, or apply
 - **Prior gaps:** (re-attempts only) Specific weaknesses from previous assessment
+- **Target gaps:** Explicit gap subset to prioritize for this attempt
+- **Difficulty level:** Integer 1-5 controlling challenge complexity
+- **Challenge focus:** `multi-gap` or `single-gap`
 - **Project context:** Conventions, notation, active phase if available
 - **Attempt number:** First attempt or re-attempt
 
@@ -141,6 +144,13 @@ For the given concept and type:
 3. Include all necessary given information (no hidden assumptions)
 4. Specify exactly what the user must produce
 5. For re-attempts: explicitly target the prior gaps
+6. Calibrate complexity to difficulty level:
+   - 1: direct reconstruction from explicit premises
+   - 2: one non-trivial inference step
+   - 3: light variation/perturbation
+   - 4: transfer to changed assumptions or boundary conditions
+   - 5: transfer plus justification of assumption changes
+7. If `challenge_focus=single-gap`, prioritize only the first listed target gap.
 
 Structure the challenge as:
 
@@ -148,6 +158,7 @@ Structure the challenge as:
 ## CHALLENGE: {concept} ({type})
 
 **Attempt:** {N}
+**Difficulty level:** {1-5}
 
 {If re-attempt: "This attempt specifically targets: {gap_1}, {gap_2}"}
 
@@ -211,6 +222,7 @@ After collecting the user's attempt, return to the orchestrator:
 **Concept:** {concept}
 **Type:** {type}
 **Attempt:** {N}
+**Difficulty level:** {1-5}
 **Challenge file:** .gpd/learning/{slug}-CHALLENGE.md
 **Hints used:** {0-3}
 **User status:** submitted | paused
