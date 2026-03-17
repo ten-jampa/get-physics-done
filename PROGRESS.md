@@ -106,3 +106,27 @@
 - Modified `src/gpd/specs/workflows/explain.md` — added `check_cache` step (use existing file or regenerate), added `from_learning` context detection, skip bibliographer when `from_learning=true`
 **Verification**: Workflow specs updated, caching paths consistent between learn and explain (both use `.gpd/explanations/{slug}-EXPLAIN.md`)
 **Notes**: Three optimizations: (1) cache check before agent spawn = instant second time, (2) bibliographer skipped for learning = saves ~1-2 min, (3) cross-workflow cache sharing = /gpd:explain then /gpd:learn (or vice versa) reuses the same file.
+
+### [2026-03-17 17:45 UTC] Committed all changes in 4 logical commits
+**Why**: Clean git history for eventual PR — each commit is a self-contained conceptual unit.
+**Status**: ✅ Complete
+**Changes**:
+- `7619395` — Core learning engine (models, FSRS-6, Bjork, adaptive policy, graph, LearningError, fsrs dep)
+- `03e89a2` — MCP server (12 tools, registration, infra descriptor, 45 tests)
+- `5efad0d` — Workflow refactor (learn.md + command use MCP tools, explanation-first offer)
+- `093960d` — Caching + UX (explanation cache, bibliographer skip for learning)
+**Verification**: `git log --oneline -4` shows 4 clean commits on `feat/gpd-learning-mcp-server` branch
+
+### [2026-03-17 18:00 UTC] Verified explanation caching works end-to-end
+**Why**: Caching is the key UX improvement — second explanation request should be instant, not another 4-min agent spawn.
+**Status**: ✅ Complete
+**Changes**: No code changes — verification only
+**Verification**: `/gpd:explain "unitary time evolution"` (2nd time) → detected cached file, displayed instantly with no agent spawn. `/gpd:explain "Attractors"` (new concept) → correctly detected no cache, spawned explainer, wrote to `.gpd/explanations/attractors-dynamical-systems-EXPLAIN.md`. Subsequent request would be cached.
+**Notes**: Caching works across both `/gpd:explain` and `/gpd:learn` explanation-first path since they share the same file location.
+
+### [2026-03-17 18:12 UTC] Session review — before/after comparison of learning engine v0 → v1
+**Why**: Assess the impact of the MCP server implementation against the original workflow-only approach.
+**Status**: ✅ Complete
+**Changes**: No code changes — analysis only
+**Verification**: Key improvements confirmed in practice: (1) MCP calls ~100ms vs manual file I/O in workflow, (2) 45 automated tests vs 0, (3) Bjork state tracking active (storage_strength updated after assessment), (4) FSRS card ready to initialize on mastery, (5) schema migration v1→v2 working on-read, (6) explanation caching eliminates repeat 4-min agent spawns
+**Notes**: Remaining gaps: agent spawn latency still 10-100s (inherent), FSRS review loop not yet tested e2e (need Level 3 mastery), `npx --local` install flow has rough edges (manual pip install needed).
