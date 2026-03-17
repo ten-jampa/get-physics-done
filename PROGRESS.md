@@ -36,3 +36,15 @@
 - Created `.gpd/learning/LEARNING-LOG.md` — session log with mastery journey
 **Verification**: Full loop executed: tutor generated challenge → user submitted handwritten photo → transcribed and confirmed → assessor correctly identified Level 2 (correct math, missing physical reasoning) → explainer taught 5 specific gaps → full explanation produced on request → session paused and logged
 **Notes**: UX issues surfaced: photo transcription is manual, argument passing dropped on 2/3 invocations, full explanation is a wall of text in terminal. These are v0.1 improvement targets.
+
+## 2026-03-17 00:22:30 EDT
+- Status: started
+- Summary: Started README alignment for updated `gpd-learn` memory and prerequisite routing behavior.
+- Context: The current README still describes only flat `.gpd/learning/` artifacts and omits the new per-concept folder + soft prerequisite guidance, which can confuse users after the recent learning-engine refactor.
+- Details: Identified target section at `README.md` Learning Engine block and prepared edits for artifact paths, adaptive loop wording, and challenge type usage guidance.
+
+## 2026-03-17 00:22:45 EDT
+- Status: completed
+- Summary: Updated Learning Engine README guidance to match current `gpd-learn` behavior and filesystem layout.
+- Context: Users were seeing stale docs after the folder-based memory/prereq refactor; aligning README prevents mismatch between runtime behavior and onboarding instructions.
+- Details: Edited `README.md` Learning Engine section to add soft prerequisite routing step, adaptive re-attempt wording, explicit challenge-type best-practice tips (`recall|derive|apply`), and new artifact layout under `.gpd/learning/{slug}/` including `MEMORY.json`; verified updates with `rg` at lines 431, 448, 454, 457, 460.
