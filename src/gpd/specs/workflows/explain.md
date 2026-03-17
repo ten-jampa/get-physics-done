@@ -119,7 +119,7 @@ Explain the following concept rigorously and in context: {concept}
 <requirements>
 1. Start with the short answer in one paragraph.
 2. Explain why this concept matters in the current project or requested task.
-3. Build a prerequisite ladder so the explanation is scoped correctly.
+3. Build a prerequisite ladder so the explanation is scoped correctly. For each prerequisite, include a copy-pasteable command so the user can quickly drill into any shaky foundation.
 4. Give the rigorous core: definition, physical meaning, assumptions, limits, and equations/derivation where needed.
 5. Connect the concept to this project's files, conventions, current phase, or manuscript claims when available.
 6. Distinguish established literature facts from project-specific assumptions or interpretations.
@@ -136,7 +136,13 @@ Structure:
 - Frontmatter (`concept`, `date`, `mode`, `project_context`, `citation_status`)
 - Executive Summary
 - Why This Matters Here
-- Prerequisites and Dependencies
+- Prerequisites and Dependencies — list each prerequisite with a one-line description and a copy-pasteable command block:
+  ```
+  Shaky on a prerequisite? Copy-paste any of these:
+    /gpd:explain "prerequisite concept 1"
+    /gpd:explain "prerequisite concept 2"
+    /gpd:learn "prerequisite concept" --type recall
+  ```
 - Core Explanation
 - Formal Structure / Equations
 - Project-Specific Connection
