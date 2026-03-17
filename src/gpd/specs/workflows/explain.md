@@ -33,8 +33,25 @@ Determine what kind of explanation is needed.
    - Brief operational clarification if the request is narrow and local
    - Full conceptual + formal explanation if the request is broader or foundational
 4. Generate a slug for the output file from the concept.
+5. Detect context: set `from_learning = true` if invoked from a learning session (e.g., via `/gpd:learn` explanation-first path, or if `.gpd/learning/{slug}/SESSION.json` exists).
 
 **Important:** Do not default to a generic textbook exposition. The explanation must answer why this matters in the user's current workflow or requested standalone task.
+</step>
+
+<step name="check_cache">
+Check if a cached explanation already exists:
+
+```bash
+ls .gpd/explanations/{slug}-EXPLAIN.md 2>/dev/null
+```
+
+If the file exists:
+- Show the user: "A prior explanation for '{concept}' already exists ({file path})."
+- Ask: "Want to **use the cached version** or **regenerate** a fresh explanation?"
+- If cached: read and display the existing explanation, skip to `return_results`.
+- If regenerate: continue to `gather_project_context`.
+
+If no cached file exists, continue normally.
 </step>
 
 <step name="gather_project_context">
@@ -144,6 +161,8 @@ task(
 </step>
 
 <step name="verify_citations">
+**Skip condition:** If `from_learning == true`, skip the bibliographer entirely — set citation status to "unverified (learning context, bibliographer skipped)" and proceed to `return_results`. The bibliographer adds significant latency that is not justified for learning explanations. Users can request citation verification explicitly with `/gpd:explain "{concept}" --verify-citations`.
+
 After the explanation is written, run the bibliographer on the produced explanation file.
 
 Resolve bibliographer model:

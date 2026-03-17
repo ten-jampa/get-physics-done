@@ -42,6 +42,7 @@ dependencies = [
     "jinja2>=3.1.6",
     # MCP servers
     "arxiv-mcp-server>=0.3.2",
+    "fsrs>=6.0.0",
 ]
 
 [project.scripts]
@@ -53,6 +54,7 @@ gpd = "gpd.cli:entrypoint"
 "gpd-mcp-patterns" = "gpd.mcp.servers.patterns_server:main"
 "gpd-mcp-state" = "gpd.mcp.servers.state_server:main"
 "gpd-mcp-skills" = "gpd.mcp.servers.skills_server:main"
+"gpd-mcp-learning" = "gpd.mcp.servers.learning_server:main"
 
 [project.urls]
 Homepage = "https://github.com/psi-oss/get-physics-done"

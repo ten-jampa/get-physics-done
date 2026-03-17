@@ -17,7 +17,8 @@ Hierarchy (errors defined in this file)::
     │   └── DuplicateApproximationError(ValueError)
     ├── PatternError                    # patterns.py
     ├── TraceError                      # trace.py
-    └── ConfigError(ValueError)         # config.py
+    ├── ConfigError(ValueError)         # config.py
+    └── LearningError                   # learning.py
 
 Errors defined in their owning modules (inherit GPDError):
 
@@ -44,6 +45,7 @@ __all__ = [
     "DuplicateResultError",
     "ExtrasError",
     "GPDError",
+    "LearningError",
     "PatternError",
     "QueryError",
     "ResultError",
@@ -120,6 +122,10 @@ class TraceError(GPDError):
 
 class ConfigError(GPDError, ValueError):
     """Error loading or validating GPD configuration."""
+
+
+class LearningError(GPDError):
+    """Error in learning engine operations (sessions, memory, review scheduling)."""
 
 
 class ValidationError(GPDError, ValueError):
