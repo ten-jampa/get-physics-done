@@ -452,10 +452,23 @@ The critical boundary is Level 2 → 3: correct computation vs. genuine understa
 - `--type derive` — use when fundamentals are present and you want step-by-step reconstruction.
 - `--type apply` — use after derive/recall to test transfer to new settings.
 
-Session artifacts are now organized per concept under `.gpd/learning/{slug}/`:
+**Spaced repetition and memory tracking:**
+
+When you reach mastery (Level 3+), the learning engine activates long-term retention:
+
+- **FSRS-6 scheduling** — an evidence-based spaced repetition algorithm schedules optimal review dates. Check what's due with `--review`:
+  ```text
+  /gpd:learn --review
+  ```
+- **Bjork dual-strength memory** — tracks *storage strength* (how deeply encoded) and *retrieval strength* (how accessible now, decays over time). High storage = slower decay, so well-drilled concepts fade more slowly.
+- **Explanation caching** — full concept explanations are cached at `.gpd/explanations/{slug}-EXPLAIN.md` and shared between `/gpd:learn` and `/gpd:explain`. Second request is instant.
+
+All learning state is managed by the `gpd-learning` MCP server (12 tools), keeping it completely separate from research state (`gpd-state`).
+
+Session artifacts are organized per concept under `.gpd/learning/{slug}/`:
 
 - `SESSION.json` (active loop state)
-- `MEMORY.json` (latest concept-level mastery snapshot)
+- `MEMORY.json` (concept memory with FSRS card + Bjork strengths, schema v2)
 - `CHALLENGE.md`, `ASSESSMENT-{N}.md`, `EXPLANATION-{N}.md`
 
 Cross-session summary remains in `.gpd/learning/LEARNING-LOG.md`.
