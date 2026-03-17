@@ -48,3 +48,61 @@
 - Summary: Updated Learning Engine README guidance to match current `gpd-learn` behavior and filesystem layout.
 - Context: Users were seeing stale docs after the folder-based memory/prereq refactor; aligning README prevents mismatch between runtime behavior and onboarding instructions.
 - Details: Edited `README.md` Learning Engine section to add soft prerequisite routing step, adaptive re-attempt wording, explicit challenge-type best-practice tips (`recall|derive|apply`), and new artifact layout under `.gpd/learning/{slug}/` including `MEMORY.json`; verified updates with `rg` at lines 431, 448, 454, 457, 460.
+
+## Session: 2026-03-17 — gpd-learning MCP Server + FSRS-6 + Dual-Strength Memory
+
+### [2026-03-17 16:25 UTC] Competitive landscape research + borrowable components report
+**Why**: Needed to know if the learning engine duplicates existing work, and what we can borrow from other systems to avoid reinventing the wheel.
+**Status**: ✅ Complete
+**Changes**:
+- Created `discussion_notes/borrowable-components-report.md` — evaluates OATutor BKT, FSRS-6, aiPlato stepwise feedback, Bjork dual-strength memory
+- Committed and pushed to `origin/main` (`ca3236b`)
+**Verification**: Report covers 4 systems with technical details, effort estimates, and integration points. No existing system combines challenge-first active recall + independent verification + physics conventions + CLI-native.
+**Notes**: Package name is `fsrs` (not `py-fsrs`), v6.3.1, pure Python. OATutor BKT is 42 lines of JS. Vestige is AGPL — take the algorithm, not the system.
+
+### [2026-03-17 16:25 UTC] Planned gpd-learning MCP server (8th server)
+**Why**: Learning state management and spaced repetition scheduling need to be testable, runtime-accessible, and cleanly separated from research state.
+**Status**: 🔄 In Progress
+**Changes**:
+- Plan written to `.claude/plans/elegant-waddling-reddy.md`
+- 3 new files: `core/learning.py`, `mcp/servers/learning_server.py`, `tests/mcp/test_learning_server.py`
+- 6 files to modify: errors.py, pyproject.toml, builtin_servers.py, __init__.py, learn.md workflow, learn.md command
+- 12 MCP tools across 4 groups: session management, memory queries, spaced repetition, prerequisite graph
+**Verification**: Plan reviewed against existing MCP server patterns (state_server.py, patterns_server.py). FSRS package verified on PyPI.
+**Notes**: Key architectural decision: learning state stays in `.gpd/learning/`, never touches ResearchState. Lazy schema migration v1→v2 on read.
+
+### [2026-03-17 17:00 UTC] Implemented gpd-learning MCP server — 12 tools, 45 tests
+**Why**: Learning state (sessions, memory, FSRS scheduling, Bjork dual-strength, prereq graph) was managed by raw file I/O in the workflow markdown — untestable, not portable across runtimes, no long-term retention system.
+**Status**: ✅ Complete
+**Changes**:
+- Created `src/gpd/core/learning.py` (~400 lines) — Pydantic models, I/O, FSRS-6, Bjork memory, adaptive policy, topo sort
+- Created `src/gpd/mcp/servers/learning_server.py` (~300 lines) — 12 MCP tools (session, memory, review, graph)
+- Created `tests/mcp/test_learning_server.py` (~500 lines) — 45 tests covering all tool groups
+- Modified `src/gpd/core/errors.py` — added `LearningError(GPDError)`
+- Modified `pyproject.toml` — added `fsrs>=6.0.0` dep + `gpd-mcp-learning` entry point
+- Modified `src/gpd/mcp/builtin_servers.py` — registered gpd-learning in `_BUILTIN_SERVERS` + `_PUBLIC_DESCRIPTOR_METADATA`
+- Modified `src/gpd/mcp/servers/__init__.py` — updated docstring to 8 servers
+- Modified `src/gpd/specs/workflows/learn.md` — refactored to use MCP tools for state management
+- Modified `src/gpd/commands/learn.md` — added 12 gpd-learning tools to allowed-tools
+- Modified `tests/test_metadata_consistency.py` — server count 7→8
+- Generated `infra/gpd-learning.json` — public descriptor
+**Verification**: 45/45 learning tests pass, 19/19 metadata tests pass, 108/108 CLI tests pass, 30/30 parity tests pass, ruff lint clean, `uv build` succeeds, `npx -y get-physics-done --claude --local --reinstall` → 25 agents, 62 commands
+**Notes**: fsrs 6.3.1 API returns (card, log) tuple not a named result. MCP server needed manual pip install into ~/.gpd/venv since npx --local fetched from PyPI instead of local wheel.
+
+### [2026-03-17 17:20 UTC] End-to-end manual test — unitary time evolution learning loop
+**Why**: Validate the full MCP-backed learning loop works: start_session → tutor → assessor → update_session → explainer → pause → resume
+**Status**: ✅ Complete
+**Changes**:
+- Created `.gpd/learning/unitary-time-evolution/` — SESSION.json, MEMORY.json, CHALLENGE.md, ASSESSMENT-1.md, EXPLANATION-1.md
+- Created `.gpd/explanations/unitary-time-evolution-EXPLAIN.md` — full concept explanation via /gpd:explain
+**Verification**: Session started fresh (resumed=false), handwritten photo transcribed, assessor returned Level 2 MECHANICAL with 5 gaps, adaptive policy applied (improving, first attempt), Bjork state updated (storage 1.0→1.3), session paused and resumed correctly, MEMORY.json has schema_version=2 with bjork fields, fsrs=null (correct — mastery not yet reached)
+**Notes**: User confirmed the MCP tools load correctly after session restart. Explanation-first offer works for new concepts but not triggered on resume (correct behavior).
+
+### [2026-03-17 17:39 UTC] Added explanation-first offer + caching + skip bibliographer for learning
+**Why**: User pain points — (1) spawning explainer takes ~4 min, so repeat explanations should be cached; (2) bibliographer adds latency with no value for learning contexts; (3) new concepts should offer explanation before challenge.
+**Status**: ✅ Complete
+**Changes**:
+- Modified `src/gpd/specs/workflows/learn.md` — explanation-first prompt for new concepts, checks cache at `.gpd/explanations/{slug}-EXPLAIN.md`, skips bibliographer
+- Modified `src/gpd/specs/workflows/explain.md` — added `check_cache` step (use existing file or regenerate), added `from_learning` context detection, skip bibliographer when `from_learning=true`
+**Verification**: Workflow specs updated, caching paths consistent between learn and explain (both use `.gpd/explanations/{slug}-EXPLAIN.md`)
+**Notes**: Three optimizations: (1) cache check before agent spawn = instant second time, (2) bibliographer skipped for learning = saves ~1-2 min, (3) cross-workflow cache sharing = /gpd:explain then /gpd:learn (or vice versa) reuses the same file.
