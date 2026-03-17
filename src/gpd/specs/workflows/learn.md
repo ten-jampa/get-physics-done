@@ -1,5 +1,7 @@
 <workflow_goal>
 Run a Feynman-style active recall loop: challenge → attempt → assess → teach gaps → re-attempt, iterating until the user achieves mastery (Level 3+) or pauses. Works both inside an initialized GPD project and standalone.
+
+State management is delegated to the `gpd-learning` MCP server. The workflow orchestrates agent spawning, user interaction, and file I/O for challenge/assessment/explanation markdown files.
 </workflow_goal>
 
 <step name="validate_context">
@@ -25,30 +27,72 @@ Extract from `$ARGUMENTS`:
 
 1. **Concept:** The physics topic (required). E.g., "Ward identity", "harmonic oscillator", "Berry phase".
 2. **--type:** Challenge type — `recall`, `derive`, or `apply`. Default: `derive`.
-3. **--review:** If set, show prior session history and exit without starting a new loop.
+3. **--review:** If set, use `get_review_queue` to show due concepts and exit.
 
-Generate a slug from the concept for file naming:
-- Lowercase, hyphens for spaces, strip special characters
-- E.g., "Ward identity" → `ward-identity`
-</step>
+If `--review` flag is set:
 
-<step name="check_prior_sessions">
-Check if prior learning sessions exist for this concept:
-
-```bash
-find ".gpd/learning/{slug}" -maxdepth 1 -name "ASSESSMENT-*.md" 2>/dev/null
-cat .gpd/learning/LEARNING-LOG.md 2>/dev/null | grep -A 8 "{concept}"
+```
+result = mcp__gpd-learning__get_review_queue(project_dir="{cwd}")
 ```
 
-If prior sessions exist:
-- Show the last mastery level achieved
-- Show the number of previous attempts
-- Show remaining gaps (if any)
-- If `--review` flag was set, display this summary and exit
+Display the review queue and exit. If the user picks a concept, start a review session for it.
+</step>
 
-If no prior sessions:
-- Note this is a fresh start
-- Continue to challenge generation
+<step name="start_session">
+Initialize or resume a learning session via MCP:
+
+```
+session_result = mcp__gpd-learning__start_session(
+  project_dir="{cwd}",
+  concept="{concept}",
+  challenge_type="{type}"
+)
+```
+
+This handles:
+- Legacy flat-file migration (automatic)
+- Session init or resume
+- Memory init or load (with v1→v2 schema migration)
+- Prerequisite checking
+
+From the result, extract:
+- `slug` — concept slug for file paths
+- `resumed` — whether this is a resumed session
+- `session` — current session state (attempt_number, difficulty_level, current_type, etc.)
+- `memory` — concept memory (last_mastery_level, active_gaps, etc.)
+- `weak_prereqs` — list of weak prerequisites
+
+If `weak_prereqs` is non-empty:
+- Show top 1-2 weak prereqs
+- Recommend bridge commands:
+  - `/gpd:learn "{prereq concept}" --type recall`
+  - `/gpd:explain "{prereq concept}"`
+- Continue current concept unless user chooses the bridge path.
+
+**Explanation-first offer for new concepts:**
+
+If this is a fresh concept (`memory.last_mastery_level == null` and `resumed == false`):
+
+> "This is a new concept. Would you like to:
+> 1. **Start with a full explanation** — get the complete picture first, then challenge yourself
+> 2. **Jump straight into the challenge** — learn by doing, gaps get explained as you go"
+
+- If the user chooses (1):
+  1. **Check cache first:** look for `.gpd/explanations/{slug}-EXPLAIN.md`. If it exists, display the cached explanation — no agent spawn needed.
+  2. **If no cache:** spawn the `gpd-explainer` agent for a full, rigorous explanation (not gap-targeted — the full treatment). Write to `.gpd/explanations/{slug}-EXPLAIN.md` (same path as `/gpd:explain` so caching works both ways). **Skip the bibliographer** — learning context does not need citation verification.
+  3. After the explanation is delivered (cached or fresh), continue into the challenge loop.
+- If the user chooses (2): proceed directly to the challenge loop (current behavior).
+
+If this is a resumed session or the user has prior mastery, skip this prompt — they already have context.
+
+Set local variables from session state:
+```
+concept_dir = .gpd/learning/{slug}
+challenge_file = {concept_dir}/CHALLENGE.md
+attempt_number = session.attempt_number
+difficulty_level = session.difficulty_level
+type = session.current_type
+```
 </step>
 
 <step name="gather_project_context">
@@ -68,108 +112,10 @@ rg -n -i --fixed-strings -- "{concept}" .gpd paper manuscript docs src 2>/dev/nu
 ```
 
 If no project context exists, proceed with no conventions — the challenge will use standard textbook notation.
-
-Create the output directory:
-
-```bash
-mkdir -p .gpd/learning
-```
-
-Ensure prerequisite graph exists (empty object is valid):
-
-```bash
-if [ ! -f .gpd/learning/concept-prereqs.json ]; then
-  cat > .gpd/learning/concept-prereqs.json <<'EOF'
-{}
-EOF
-fi
-```
 </step>
 
 <step name="learning_loop">
 This is the mastery-bounded loop. It runs until mastery is achieved (Level 3+) or the user pauses.
-
-Initialize loop state:
-
-```
-attempt_number = 1
-previous_level = null
-previous_gaps = []
-consecutive_plateau = 0
-difficulty_level = 2
-score_history = []
-gap_history = []
-concept_dir = .gpd/learning/{slug}
-session_file = {concept_dir}/SESSION.json
-memory_file = {concept_dir}/MEMORY.json
-challenge_file = {concept_dir}/CHALLENGE.md
-prereq_graph_file = .gpd/learning/concept-prereqs.json
-```
-
-Create concept directory and migrate legacy flat files once (move in place):
-
-```bash
-mkdir -p "{concept_dir}"
-for suffix in SESSION.json CHALLENGE.md; do
-  legacy=".gpd/learning/{slug}-${suffix}"
-  target="{concept_dir}/${suffix}"
-  if [ -f "$legacy" ] && [ ! -f "$target" ]; then
-    mv "$legacy" "$target"
-  fi
-done
-for legacy in .gpd/learning/{slug}-ASSESSMENT-*.md .gpd/learning/{slug}-EXPLANATION-*.md; do
-  if [ -f "$legacy" ]; then
-    base="$(basename "$legacy")"
-    new_name="$(printf "%s" "$base" | sed "s/^${slug}-//")"
-    target="{concept_dir}/${new_name}"
-    if [ ! -f "$target" ]; then
-      mv "$legacy" "$target"
-    fi
-  fi
-done
-```
-
-Initialize or load `{concept_dir}/SESSION.json` so re-attempt routing is deterministic across pauses:
-
-```json
-{
-  "concept": "{concept}",
-  "current_type": "{type}",
-  "difficulty_level": 2,
-  "attempt_number": 1,
-  "score_history": [],
-  "gap_history": [],
-  "plateau_count": 0,
-  "status": "active"
-}
-```
-
-Initialize or load `{concept_dir}/MEMORY.json`:
-
-```json
-{
-  "concept": "{concept}",
-  "slug": "{slug}",
-  "last_mastery_level": null,
-  "last_type": "{type}",
-  "last_difficulty": 2,
-  "active_gaps": [],
-  "misconceptions": [],
-  "updated_at": "{ISO timestamp}"
-}
-```
-
-Soft prerequisite routing before challenge generation:
-
-1. Read `{prereq_graph_file}` and collect prereq slugs for `{slug}` (empty list if absent).
-2. For each prereq slug, check `.gpd/learning/{prereq_slug}/MEMORY.json`.
-3. Mark prereq weak if memory file missing OR `last_mastery_level < 2`.
-4. If weak prereqs exist:
-   - Show top 1-2 weak prereqs
-   - Recommend bridge commands:
-     - `/gpd:learn "{prereq human name}" --type recall`
-     - `/gpd:explain "{prereq human name}"`
-   - Continue current concept unless user chooses the bridge path.
 
 ### Step 5a: Spawn Tutor — Generate Challenge, Collect Attempt
 
@@ -225,7 +171,7 @@ Generate a refocused challenge targeting specific gaps and collect the user's at
 - Concept: {concept}
 - Challenge type: {type}
 - Difficulty level (1-5): {difficulty_level}
-- Challenge focus: {single-gap if regression else multi-gap}
+- Challenge focus: {challenge_focus from policy, default "multi-gap"}
 - Attempt number: {attempt_number}
 - Prior mastery level: {previous_level}
 - Prior gaps: {previous_gaps}
@@ -255,7 +201,7 @@ task(
 )
 ```
 
-If tutor returns "paused" status → jump to `update_learning_log` with status=paused.
+If tutor returns "paused" status → jump to `end_session` with status=paused.
 If tutor returns "blocked" status → suggest `/gpd:explain "{concept}"` and exit.
 
 ### Step 5b: Spawn Assessor — Evaluate Attempt
@@ -314,96 +260,44 @@ Parse the assessor's return:
 - `GAPS`
 - `RECOMMENDED_NEXT_TYPE`
 - `RECOMMENDED_DIFFICULTY_DELTA`
-- `IMPROVED_SINCE_LAST`
 
-### Step 5c: Mastery Check (Orchestrator Logic — No Agent Spawn)
+### Step 5c: Update Session via MCP (Replaces manual state management)
 
-Evaluate the assessment result:
+Call the MCP server to record the assessment, apply adaptive policy, and update Bjork state:
 
-**Mastery achieved (Level 3+):**
 ```
-if mastery_level >= 3:
-    → Display celebration message
-    → Show assessment highlights
-    → session.status = "mastered"
-    → Jump to update_learning_log with status=mastered
-```
-
-**Improving but below mastery:**
-```
-if mastery_level > previous_level:
-    consecutive_plateau = 0
-    difficulty_level = min(5, difficulty_level + 1)
-    if recommended_next_type is valid and recommended_next_type != type:
-        type = recommended_next_type
-    → "Improving! Level {previous_level} → {mastery_level}."
-    → "Gap remaining: {primary_gap}. Increasing difficulty to {difficulty_level}."
-    → Continue to Step 5d
+update_result = mcp__gpd-learning__update_session(
+  project_dir="{cwd}",
+  slug="{slug}",
+  mastery_level={MASTER_LEVEL},
+  gaps={GAPS as list},
+  misconceptions={misconceptions if any, else null},
+  recommended_next_type="{RECOMMENDED_NEXT_TYPE}"
+)
 ```
 
-**Single plateau (same level once):**
+From the result, read the adaptive policy:
+- `policy.action` — one of: mastered, improving, plateau, double_plateau, regression
+- `policy.next_type` — challenge type for next attempt
+- `policy.next_difficulty` — difficulty for next attempt
+- `policy.challenge_focus` — "multi-gap" or "single-gap"
+- `policy.message` — human-readable status message
+
+Display the policy message to the user.
+
+**If mastered:** Jump to `end_session` with status=mastered.
+
+**Otherwise:** Update local variables from session state:
 ```
-if mastery_level == previous_level:
-    consecutive_plateau += 1
-    if consecutive_plateau == 1:
-        → "Same level as last attempt. Keep difficulty at {difficulty_level}, refocus on primary gap."
-        → Continue to Step 5d
+type = policy.next_type
+difficulty_level = policy.next_difficulty
+challenge_focus = policy.challenge_focus
+attempt_number = update_result.session.attempt_number
+previous_level = {MASTER_LEVEL}
+previous_gaps = {GAPS}
 ```
 
-**Repeated plateau (same level at least twice):**
-```
-if mastery_level == previous_level and consecutive_plateau >= 2:
-    difficulty_level = max(1, difficulty_level - 1)
-    if type == "derive":
-        type = "apply"
-    elif type == "apply":
-        type = "derive"
-    elif type == "recall":
-        type = "derive"
-    consecutive_plateau = 0
-    → "Plateau detected — switching challenge type to {type} and reducing difficulty to {difficulty_level}."
-    → Continue to Step 5d
-```
-
-**Regression:**
-```
-if mastery_level < previous_level:
-    difficulty_level = max(1, difficulty_level - 1)
-    challenge_focus = "single-gap"
-    if recommended_next_type is valid and recommended_next_type != type:
-        type = recommended_next_type
-    → "Level dropped from {previous_level} to {mastery_level}."
-    → "Reducing difficulty to {difficulty_level} and isolating one gap."
-    → Continue to Step 5d
-```
-
-**User pause:** At any point, if the user says "pause", jump to `update_learning_log` with status=paused.
-
-Update loop state:
-```
-previous_level = mastery_level
-previous_gaps = gaps
-score_history.append(mastery_level)
-gap_history.append(gaps)
-attempt_number += 1
-write session_file:
-  current_type = type
-  difficulty_level = difficulty_level
-  attempt_number = attempt_number
-  score_history = score_history
-  gap_history = gap_history
-  plateau_count = consecutive_plateau
-  status = "active"
-write memory_file:
-  concept = concept
-  slug = slug
-  last_mastery_level = mastery_level
-  last_type = type
-  last_difficulty = difficulty_level
-  active_gaps = gaps
-  misconceptions = conceptual_misconceptions_from_assessment_if_any
-  updated_at = now_iso
-```
+Continue to Step 5d.
 
 ### Step 5d: Spawn Explainer — Teach Specific Gaps
 
@@ -464,36 +358,27 @@ After the explanation is delivered:
 1. Present a summary of the gap explanation to the user
 2. Ask: "Ready to try the challenge again, or want to pause and come back later?"
 3. If user says yes/ready → loop back to Step 5a
-4. If user says pause/stop → jump to `update_learning_log` with status=paused
+4. If user says pause/stop → jump to `end_session` with status=paused
 
 </step>
 
-<step name="update_learning_log">
-Append to `.gpd/learning/LEARNING-LOG.md`:
-
-```markdown
-## {date} — {concept}
-- **Challenge type:** {type}
-- **Attempts:** {attempt_number}
-- **Final mastery level:** {mastery_level} ({mastery_name})
-- **Journey:** Level {level_1} → {level_2} → ... → {final_level}
-- **Gaps closed:** {list of gaps that were resolved across attempts}
-- **Gaps remaining:** {list or "none"}
-- **Status:** mastered | paused | plateau
-- **Difficulty journey:** {difficulty_1} → ... → {difficulty_N}
-- **Files:** {slug}/SESSION.json, {slug}/MEMORY.json, {slug}/CHALLENGE.md, {slug}/ASSESSMENT-1..{N}.md, {slug}/EXPLANATION-1..{N}.md
-```
-
-If the file doesn't exist yet, create it with a header:
-
-```markdown
-# Learning Log
-
-Feynman learning loop sessions. Each entry records a mastery journey.
-
----
+<step name="end_session">
+Finalize the session via MCP. This handles FSRS card initialization on mastery,
+learning log append, and session status update:
 
 ```
+end_result = mcp__gpd-learning__end_session(
+  project_dir="{cwd}",
+  slug="{slug}",
+  status="{status}",
+  level_name="{LEVEL_NAME}",
+  gaps_closed={list of gaps that were resolved}
+)
+```
+
+If `status == "mastered"` and `end_result.fsrs_initialized == true`:
+- Note that spaced repetition is now active
+- Show `end_result.next_review` date for when to revisit
 </step>
 
 <step name="return_results">
@@ -509,6 +394,9 @@ Return to the user with a session summary.
 **Gaps closed:** {list}
 
 You can now derive and explain {concept} from scratch. Feynman would approve.
+
+**Spaced repetition active:** Next review scheduled for {next_review_date}.
+**Review all due concepts:** /gpd:learn --review
 
 **Next challenge:** /gpd:learn "{harder_related_concept}" --type apply
 **Deepen further:** /gpd:learn "{concept}" --type apply (if current was derive)
@@ -551,3 +439,5 @@ Or build prerequisites:
 **Session files:** .gpd/learning/{slug}/*
 ```
 </step>
+</content>
+</invoke>
