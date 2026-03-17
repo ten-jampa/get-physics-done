@@ -362,9 +362,14 @@ class TestFSRS:
         state = init_fsrs_card(now)
         assert state.stability is not None
         assert state.difficulty is not None
-        assert state.reps == 1
+        assert state.reps == 2  # Two Good reviews to graduate from Learning → Review
         assert state.lapses == 0
+        assert state.state == 2  # Review state (graduated from Learning)
         assert state.next_review is not None
+        # Next review should be days away, not minutes
+        next_dt = datetime.fromisoformat(state.next_review)
+        hours_until = (next_dt - now).total_seconds() / 3600
+        assert hours_until > 12, f"Expected days-scale interval, got {hours_until:.1f} hours"
 
     def test_no_card_below_mastery(self, tmp_path: Path) -> None:
         from gpd.mcp.servers.learning_server import end_session, start_session, update_session

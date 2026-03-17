@@ -461,13 +461,20 @@ def _state_from_card(card: fsrs.Card, reps: int, lapses: int) -> FSRSState:
 
 
 def init_fsrs_card(now: datetime | None = None) -> FSRSState:
-    """Initialize a new FSRS card (called when concept reaches Level 3+)."""
+    """Initialize a new FSRS card (called when concept reaches Level 3+).
+
+    Does two Good reviews to graduate the card from Learning → Review state.
+    A single review leaves the card in Learning with a ~10 minute interval,
+    which makes sense for flashcards but not for mastery-loop concepts where
+    the user just spent 30+ minutes demonstrating understanding.
+    """
     if now is None:
         now = datetime.now(UTC)
     card = fsrs.Card()
-    # Do an initial "Good" review to set stability/difficulty
+    # Two Good reviews: Learning(step 0) → Learning(step 1) → Review
     card, _log = _scheduler.review_card(card, fsrs.Rating.Good, now)
-    return _state_from_card(card, reps=1, lapses=0)
+    card, _log = _scheduler.review_card(card, fsrs.Rating.Good, now)
+    return _state_from_card(card, reps=2, lapses=0)
 
 
 def record_fsrs_review(
