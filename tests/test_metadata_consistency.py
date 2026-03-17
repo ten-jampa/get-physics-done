@@ -153,7 +153,7 @@ def test_mcp_server_count_matches_public_entrypoints() -> None:
     repo_root = _repo_root()
     mcp_server_count = len([p for p in (repo_root / "src" / "gpd" / "mcp" / "servers").glob("*.py") if p.name != "__init__.py"])
     mcp_script_count = sum(1 for line in _project_script_lines(repo_root) if line.startswith('"gpd-mcp-'))
-    assert mcp_server_count == 7
+    assert mcp_server_count == 8
     assert mcp_server_count == mcp_script_count
 
 

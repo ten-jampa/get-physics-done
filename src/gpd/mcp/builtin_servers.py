@@ -57,6 +57,11 @@ _BUILTIN_SERVERS: dict[str, _ServerDef] = {
         "args": ["-m", "gpd.mcp.servers.verification_server"],
         "env": {"LOG_LEVEL": "${LOG_LEVEL:-WARNING}"},
     },
+    "gpd-learning": {
+        "command": "python",
+        "args": ["-m", "gpd.mcp.servers.learning_server"],
+        "env": {"LOG_LEVEL": "${LOG_LEVEL:-WARNING}"},
+    },
     "gpd-arxiv": {
         "command": "python",
         "args": ["-m", "arxiv_mcp_server"],
@@ -207,6 +212,32 @@ _PUBLIC_DESCRIPTOR_METADATA: dict[str, dict[str, object]] = {
             "tool": "get_checklist",
             "input": {"domain": "qft"},
             "expect": "contains Ward identities",
+        },
+    },
+    "gpd-learning": {
+        "description": (
+            "GPD learning engine with FSRS-6 spaced repetition and Bjork dual-strength memory. "
+            "Tools for session management, concept memory, review scheduling, and prerequisite graphs."
+        ),
+        "capabilities": [
+            "start_session",
+            "update_session",
+            "end_session",
+            "get_memory",
+            "list_concepts_tool",
+            "get_prereqs",
+            "get_review_queue",
+            "record_review",
+            "get_review_stats_tool",
+            "add_prereq",
+            "remove_prereq",
+            "get_learning_path",
+        ],
+        "registry_prefix": "gpd_learning",
+        "health_check": {
+            "tool": "get_review_stats_tool",
+            "input": {"project_dir": "/tmp/test"},
+            "expect": "contains total_cards",
         },
     },
     "gpd-arxiv": {

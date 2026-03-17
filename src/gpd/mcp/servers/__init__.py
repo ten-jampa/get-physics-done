@@ -1,4 +1,4 @@
-"""MCP servers for GPD — conventions, verification, protocols, errors, patterns, state, skills."""
+"""MCP servers for GPD — conventions, verification, protocols, errors, patterns, state, skills, learning."""
 
 from __future__ import annotations
 

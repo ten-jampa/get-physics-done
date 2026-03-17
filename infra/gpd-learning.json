@@ -1,0 +1,45 @@
+{
+  "name": "gpd-learning",
+  "description": "GPD learning engine with FSRS-6 spaced repetition and Bjork dual-strength memory. Tools for session management, concept memory, review scheduling, and prerequisite graphs.",
+  "transport": "stdio",
+  "command": "gpd-mcp-learning",
+  "args": [],
+  "env": {
+    "LOG_LEVEL": "${LOG_LEVEL:-WARNING}"
+  },
+  "capabilities": [
+    "start_session",
+    "update_session",
+    "end_session",
+    "get_memory",
+    "list_concepts_tool",
+    "get_prereqs",
+    "get_review_queue",
+    "record_review",
+    "get_review_stats_tool",
+    "add_prereq",
+    "remove_prereq",
+    "get_learning_path"
+  ],
+  "registry_prefix": "gpd_learning",
+  "prerequisites": [
+    "Install GPD first: npx -y get-physics-done"
+  ],
+  "health_check": {
+    "tool": "get_review_stats_tool",
+    "input": {
+      "project_dir": "/tmp/test"
+    },
+    "expect": "contains total_cards"
+  },
+  "alternatives": {
+    "python_module": {
+      "command": "python",
+      "args": [
+        "-m",
+        "gpd.mcp.servers.learning_server"
+      ],
+      "notes": "Requires gpd package installed"
+    }
+  }
+}
