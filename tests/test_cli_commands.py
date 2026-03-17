@@ -810,6 +810,48 @@ class TestReviewValidationCommands:
             "Either provide concept, result, method, notation, or paper explicitly, or run `gpd init new-project`."
         )
 
+    def test_command_context_learn_requires_explicit_inputs_without_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        empty_dir = tmp_path / "empty-context"
+        empty_dir.mkdir()
+        monkeypatch.chdir(empty_dir)
+
+        result = runner.invoke(
+            app,
+            ["--raw", "--cwd", str(empty_dir), "validate", "command-context", "learn"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert payload["command"] == "gpd:learn"
+        assert payload["context_mode"] == "project-aware"
+        assert payload["passed"] is False
+        assert payload["explicit_inputs"] == ["[concept] [--type recall|derive|apply] [--review]"]
+        assert payload["guidance"] == (
+            "Either provide [concept] [--type recall|derive|apply] [--review] explicitly, or run `gpd init new-project`."
+        )
+
+    def test_command_context_learn_accepts_explicit_inputs_without_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        empty_dir = tmp_path / "empty-context"
+        empty_dir.mkdir()
+        monkeypatch.chdir(empty_dir)
+
+        result = runner.invoke(
+            app,
+            ["--raw", "--cwd", str(empty_dir), "validate", "command-context", "learn", "lagrange and hamilton"],
+            catch_exceptions=False,
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["command"] == "gpd:learn"
+        assert payload["context_mode"] == "project-aware"
+        assert payload["passed"] is True
+
     def test_command_context_compare_results_requires_explicit_inputs_without_project(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

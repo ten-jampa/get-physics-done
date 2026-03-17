@@ -428,9 +428,10 @@ The `learn` command runs a mastery-bounded loop:
 1. **Challenge** — a `gpd-tutor` agent generates a calibrated physics challenge (recall, derive, or apply)
 2. **Attempt** — you submit your work inline or by file reference
 3. **Assess** — a `gpd-mastery-assessor` independently verifies your work and assigns a mastery level (0–4)
-4. **Teach gaps** — if below mastery, `gpd-explainer` teaches the specific gaps identified
-5. **Re-attempt** — the loop repeats with challenges refocused on your weak areas
-6. **Mastery** — the loop ends when you reach Level 3 (Understanding) or higher
+4. **Adapt route** — if prerequisites are weak, the loop suggests a soft bridge path (`--type recall` or `gpd:explain`) before continuing
+5. **Teach gaps** — if below mastery, `gpd-explainer` teaches the specific gaps identified
+6. **Re-attempt** — the loop repeats with adaptive challenge type/difficulty based on your latest assessment
+7. **Mastery** — the loop ends when you reach Level 3 (Understanding) or higher
 
 **Mastery levels:**
 
@@ -444,7 +445,19 @@ The `learn` command runs a mastery-bounded loop:
 
 The critical boundary is Level 2 → 3: correct computation vs. genuine understanding.
 
-All session artifacts (challenges, assessments, explanations) are saved in `.gpd/learning/` with an append-only learning log for tracking progress over time.
+**When to use each challenge type:**
+
+- `--type recall` — use when prerequisites feel shaky or you cannot start a derivation confidently.
+- `--type derive` — use when fundamentals are present and you want step-by-step reconstruction.
+- `--type apply` — use after derive/recall to test transfer to new settings.
+
+Session artifacts are now organized per concept under `.gpd/learning/{slug}/`:
+
+- `SESSION.json` (active loop state)
+- `MEMORY.json` (latest concept-level mastery snapshot)
+- `CHALLENGE.md`, `ASSESSMENT-{N}.md`, `EXPLANATION-{N}.md`
+
+Cross-session summary remains in `.gpd/learning/LEARNING-LOG.md`.
 
 ## Local Development
 

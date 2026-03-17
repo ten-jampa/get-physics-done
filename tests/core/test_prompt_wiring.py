@@ -1250,6 +1250,29 @@ def test_verification_and_publication_prompts_keep_decisive_contract_targets_rea
     assert "Treat referee requests beyond the manuscript's honest scope as optional unless they expose a real support gap" in respond
 
 
+def test_learn_workflow_uses_concept_directory_memory_and_prereq_soft_gate() -> None:
+    learn_workflow = (WORKFLOWS_DIR / "learn.md").read_text(encoding="utf-8")
+    learn_command = (COMMANDS_DIR / "learn.md").read_text(encoding="utf-8")
+    tutor_agent = (AGENTS_DIR / "gpd-tutor.md").read_text(encoding="utf-8")
+    assessor_agent = (AGENTS_DIR / "gpd-mastery-assessor.md").read_text(encoding="utf-8")
+
+    assert "concept_dir = .gpd/learning/{slug}" in learn_workflow
+    assert "session_file = {concept_dir}/SESSION.json" in learn_workflow
+    assert "memory_file = {concept_dir}/MEMORY.json" in learn_workflow
+    assert ".gpd/learning/concept-prereqs.json" in learn_workflow
+    assert "Soft prerequisite routing before challenge generation" in learn_workflow
+    assert "challenge_file = {concept_dir}/CHALLENGE.md" in learn_workflow
+    assert "{concept_dir}/ASSESSMENT-{attempt_number}.md" in learn_workflow
+    assert "{concept_dir}/EXPLANATION-{attempt_number}.md" in learn_workflow
+    assert ".gpd/learning/{slug}-CHALLENGE.md" not in learn_workflow
+    assert ".gpd/learning/{slug}-ASSESSMENT-{attempt_number}.md" not in learn_workflow
+
+    assert ".gpd/learning/{slug}/CHALLENGE.md" in tutor_agent
+    assert ".gpd/learning/{slug}/ASSESSMENT-{attempt_number}.md" in assessor_agent
+    assert ".gpd/learning/{slug}/SESSION.json" in learn_command
+    assert ".gpd/learning/{slug}/MEMORY.json" in learn_command
+
+
 def test_repo_graph_prompt_scope_counts_match_repo_inventory() -> None:
     assert parse_scope_count("src/gpd/commands/*.md") == len(list(COMMANDS_DIR.glob("*.md")))
     assert parse_scope_count("src/gpd/agents/*.md") == len(list(AGENTS_DIR.glob("*.md")))
