@@ -186,7 +186,7 @@ If the user says "pause" or "stop", acknowledge and return control to the orches
 
 ## Step 4: Write the Challenge File
 
-Write (or append for re-attempts) to `.gpd/learning/{slug}-CHALLENGE.md`:
+Write (or append for re-attempts) to `.gpd/learning/{slug}/CHALLENGE.md`:
 
 ```markdown
 ---
@@ -223,7 +223,7 @@ After collecting the user's attempt, return to the orchestrator:
 **Type:** {type}
 **Attempt:** {N}
 **Difficulty level:** {1-5}
-**Challenge file:** .gpd/learning/{slug}-CHALLENGE.md
+**Challenge file:** .gpd/learning/{slug}/CHALLENGE.md
 **Hints used:** {0-3}
 **User status:** submitted | paused
 

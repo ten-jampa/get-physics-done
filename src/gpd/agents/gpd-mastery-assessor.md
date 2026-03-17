@@ -167,7 +167,7 @@ These gaps are passed to the explainer for targeted teaching and to the tutor fo
 
 ## Step 6: Write the Assessment
 
-Write to `.gpd/learning/{slug}-ASSESSMENT-{attempt_number}.md`:
+Write to `.gpd/learning/{slug}/ASSESSMENT-{attempt_number}.md`:
 
 ```markdown
 ---
@@ -239,7 +239,7 @@ After writing the assessment, return to the orchestrator:
 **Attempt:** {N}
 **Mastery level:** {0-4} — {LEVEL_NAME}
 **Correct:** {yes|partially|no}
-**Assessment file:** .gpd/learning/{slug}-ASSESSMENT-{N}.md
+**Assessment file:** .gpd/learning/{slug}/ASSESSMENT-{N}.md
 **Improved since last:** {true|false|first_attempt}
 
 **Gaps:**

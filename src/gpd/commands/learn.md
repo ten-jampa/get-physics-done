@@ -34,7 +34,7 @@ Concept or topic: $ARGUMENTS
 Check for prior learning sessions:
 
 ```bash
-ls .gpd/learning/*.md 2>/dev/null | head -10
+find .gpd/learning -maxdepth 2 -name "*.md" 2>/dev/null | head -10
 cat .gpd/learning/LEARNING-LOG.md 2>/dev/null | tail -30
 ```
 
@@ -81,7 +81,8 @@ Show the mastery journey, final level, gaps closed, and suggested next steps.
 - [ ] If below mastery (Level 3): adaptive policy applied (difficulty/type adjustment) before re-attempt
 - [ ] If below mastery (Level 3): gaps taught by `gpd-explainer`, re-attempt offered
 - [ ] Loop terminates on mastery (Level 3+) or user pause
-- [ ] Session state persisted to `.gpd/learning/{slug}-SESSION.json`
+- [ ] Session state persisted to `.gpd/learning/{slug}/SESSION.json`
+- [ ] Concept memory persisted to `.gpd/learning/{slug}/MEMORY.json`
 - [ ] Learning log updated with session summary
 - [ ] User receives mastery journey and next steps
 </success_criteria>

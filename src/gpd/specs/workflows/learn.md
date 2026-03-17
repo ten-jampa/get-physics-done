@@ -36,7 +36,7 @@ Generate a slug from the concept for file naming:
 Check if prior learning sessions exist for this concept:
 
 ```bash
-ls .gpd/learning/{slug}-ASSESSMENT-*.md 2>/dev/null
+find ".gpd/learning/{slug}" -maxdepth 1 -name "ASSESSMENT-*.md" 2>/dev/null
 cat .gpd/learning/LEARNING-LOG.md 2>/dev/null | grep -A 8 "{concept}"
 ```
 
@@ -74,6 +74,16 @@ Create the output directory:
 ```bash
 mkdir -p .gpd/learning
 ```
+
+Ensure prerequisite graph exists (empty object is valid):
+
+```bash
+if [ ! -f .gpd/learning/concept-prereqs.json ]; then
+  cat > .gpd/learning/concept-prereqs.json <<'EOF'
+{}
+EOF
+fi
+```
 </step>
 
 <step name="learning_loop">
@@ -89,10 +99,37 @@ consecutive_plateau = 0
 difficulty_level = 2
 score_history = []
 gap_history = []
-session_file = .gpd/learning/{slug}-SESSION.json
+concept_dir = .gpd/learning/{slug}
+session_file = {concept_dir}/SESSION.json
+memory_file = {concept_dir}/MEMORY.json
+challenge_file = {concept_dir}/CHALLENGE.md
+prereq_graph_file = .gpd/learning/concept-prereqs.json
 ```
 
-Initialize or load `.gpd/learning/{slug}-SESSION.json` so re-attempt routing is deterministic across pauses:
+Create concept directory and migrate legacy flat files once (move in place):
+
+```bash
+mkdir -p "{concept_dir}"
+for suffix in SESSION.json CHALLENGE.md; do
+  legacy=".gpd/learning/{slug}-${suffix}"
+  target="{concept_dir}/${suffix}"
+  if [ -f "$legacy" ] && [ ! -f "$target" ]; then
+    mv "$legacy" "$target"
+  fi
+done
+for legacy in .gpd/learning/{slug}-ASSESSMENT-*.md .gpd/learning/{slug}-EXPLANATION-*.md; do
+  if [ -f "$legacy" ]; then
+    base="$(basename "$legacy")"
+    new_name="$(printf "%s" "$base" | sed "s/^${slug}-//")"
+    target="{concept_dir}/${new_name}"
+    if [ ! -f "$target" ]; then
+      mv "$legacy" "$target"
+    fi
+  fi
+done
+```
+
+Initialize or load `{concept_dir}/SESSION.json` so re-attempt routing is deterministic across pauses:
 
 ```json
 {
@@ -106,6 +143,33 @@ Initialize or load `.gpd/learning/{slug}-SESSION.json` so re-attempt routing is 
   "status": "active"
 }
 ```
+
+Initialize or load `{concept_dir}/MEMORY.json`:
+
+```json
+{
+  "concept": "{concept}",
+  "slug": "{slug}",
+  "last_mastery_level": null,
+  "last_type": "{type}",
+  "last_difficulty": 2,
+  "active_gaps": [],
+  "misconceptions": [],
+  "updated_at": "{ISO timestamp}"
+}
+```
+
+Soft prerequisite routing before challenge generation:
+
+1. Read `{prereq_graph_file}` and collect prereq slugs for `{slug}` (empty list if absent).
+2. For each prereq slug, check `.gpd/learning/{prereq_slug}/MEMORY.json`.
+3. Mark prereq weak if memory file missing OR `last_mastery_level < 2`.
+4. If weak prereqs exist:
+   - Show top 1-2 weak prereqs
+   - Recommend bridge commands:
+     - `/gpd:learn "{prereq human name}" --type recall`
+     - `/gpd:explain "{prereq human name}"`
+   - Continue current concept unless user chooses the bridge path.
 
 ### Step 5a: Spawn Tutor — Generate Challenge, Collect Attempt
 
@@ -131,7 +195,7 @@ Generate a physics challenge and collect the user's attempt.
 - Challenge focus: multi-gap
 - Attempt number: {attempt_number}
 - Project conventions: {conventions or "none — use standard notation"}
-- Challenge file: .gpd/learning/{slug}-CHALLENGE.md
+- Challenge file: {challenge_file}
 </context>
 
 <requirements>
@@ -144,7 +208,7 @@ Generate a physics challenge and collect the user's attempt.
    - 5: transfer + justification of assumption changes
 3. Explicitly include `target_gaps=[]` for attempt 1.
 4. Present it to the user and collect their attempt.
-5. Write the challenge spec and attempt to .gpd/learning/{slug}-CHALLENGE.md
+5. Write the challenge spec and attempt to {challenge_file}
 6. Follow the hint policy if the user asks for help (3 escalating hints, never the answer).
 7. If the user says "pause" or "stop", acknowledge and return.
 </requirements>
@@ -166,7 +230,7 @@ Generate a refocused challenge targeting specific gaps and collect the user's at
 - Prior mastery level: {previous_level}
 - Prior gaps: {previous_gaps}
 - Project conventions: {conventions or "none — use standard notation"}
-- Challenge file: .gpd/learning/{slug}-CHALLENGE.md
+- Challenge file: {challenge_file}
 </context>
 
 <requirements>
@@ -175,7 +239,7 @@ Generate a refocused challenge targeting specific gaps and collect the user's at
 3. Keep the same core concept but refocus to test the weak areas.
 4. Calibrate complexity to difficulty level {difficulty_level} using the same 1-5 ladder.
 5. Present it to the user and collect their attempt.
-6. Append the new attempt to .gpd/learning/{slug}-CHALLENGE.md
+6. Append the new attempt to {challenge_file}
 7. Follow the hint policy if the user asks for help.
 8. If the user says "pause" or "stop", acknowledge and return.
 </requirements>
@@ -210,10 +274,10 @@ Assess the user's physics work for correctness, understanding, and mastery level
 </objective>
 
 <context>
-- Challenge file: .gpd/learning/{slug}-CHALLENGE.md
+- Challenge file: {challenge_file}
 - Attempt number: {attempt_number}
 - Previous assessment: {previous_level and previous_gaps, or "first attempt"}
-- Assessment output: .gpd/learning/{slug}-ASSESSMENT-{attempt_number}.md
+- Assessment output: {concept_dir}/ASSESSMENT-{attempt_number}.md
 </context>
 
 <requirements>
@@ -230,7 +294,7 @@ Assess the user's physics work for correctness, understanding, and mastery level
    - `GAPS`
    - `RECOMMENDED_NEXT_TYPE` (recall|derive|apply)
    - `RECOMMENDED_DIFFICULTY_DELTA` (-1|0|+1)
-8. Write assessment to .gpd/learning/{slug}-ASSESSMENT-{attempt_number}.md
+8. Write assessment to {concept_dir}/ASSESSMENT-{attempt_number}.md
 </requirements>
 ```
 
@@ -330,6 +394,15 @@ write session_file:
   gap_history = gap_history
   plateau_count = consecutive_plateau
   status = "active"
+write memory_file:
+  concept = concept
+  slug = slug
+  last_mastery_level = mastery_level
+  last_type = type
+  last_difficulty = difficulty_level
+  active_gaps = gaps
+  misconceptions = conceptual_misconceptions_from_assessment_if_any
+  updated_at = now_iso
 ```
 
 ### Step 5d: Spawn Explainer — Teach Specific Gaps
@@ -361,11 +434,11 @@ Explain the specific gaps identified in the user's physics work. This is targete
 3. Bridge intuition to formalism: give the physical picture AND the math.
 4. Use the project's notation/conventions if available.
 5. Keep it focused: 1-3 paragraphs per gap, not a textbook chapter.
-6. Write the explanation to .gpd/learning/{slug}-EXPLANATION-{attempt_number}.md
+6. Write the explanation to {concept_dir}/EXPLANATION-{attempt_number}.md
 </requirements>
 
 <output>
-Write to: .gpd/learning/{slug}-EXPLANATION-{attempt_number}.md
+Write to: {concept_dir}/EXPLANATION-{attempt_number}.md
 
 Structure:
 - Frontmatter (concept, gaps_addressed, date)
@@ -408,7 +481,7 @@ Append to `.gpd/learning/LEARNING-LOG.md`:
 - **Gaps remaining:** {list or "none"}
 - **Status:** mastered | paused | plateau
 - **Difficulty journey:** {difficulty_1} → ... → {difficulty_N}
-- **Files:** {slug}-SESSION.json, {slug}-CHALLENGE.md, ASSESSMENT-1..{N}, EXPLANATION-1..{N}
+- **Files:** {slug}/SESSION.json, {slug}/MEMORY.json, {slug}/CHALLENGE.md, {slug}/ASSESSMENT-1..{N}.md, {slug}/EXPLANATION-1..{N}.md
 ```
 
 If the file doesn't exist yet, create it with a header:
@@ -440,7 +513,7 @@ You can now derive and explain {concept} from scratch. Feynman would approve.
 **Next challenge:** /gpd:learn "{harder_related_concept}" --type apply
 **Deepen further:** /gpd:learn "{concept}" --type apply (if current was derive)
 
-**Session files:** .gpd/learning/{slug}-*
+**Session files:** .gpd/learning/{slug}/*
 ```
 
 **If paused:**
@@ -458,7 +531,7 @@ Progress saved. Resume anytime:
 Study before retrying:
   /gpd:explain "{specific_gap}"
 
-**Session files:** .gpd/learning/{slug}-*
+**Session files:** .gpd/learning/{slug}/*
 ```
 
 **If plateau:**
@@ -475,6 +548,6 @@ Consider a different angle:
 Or build prerequisites:
   /gpd:learn "{prerequisite_concept}"
 
-**Session files:** .gpd/learning/{slug}-*
+**Session files:** .gpd/learning/{slug}/*
 ```
 </step>

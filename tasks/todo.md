@@ -1,20 +1,22 @@
 # TODO
 
-## Session: gpd-learn mastery + adaptive implementation
+## Session: gpd-learn concept memory + prerequisite routing
 
-- [x] Create feature branch `feat/learn-mastery-adaptive-v1`
-- [x] Update learn workflow contract with deterministic adaptive policy
-- [x] Add session-state artifact contract (`.gpd/learning/{slug}-SESSION.json`)
-- [x] Extend assessor machine-readable output contract
-- [x] Extend tutor challenge calibration contract (difficulty + target gaps)
-- [x] Align `gpd:learn` command success criteria
-- [x] Add CLI tests for `validate command-context learn` explicit-input behavior
+- [x] Create feature branch `feat/learn-concept-memory-prereqs`
+- [x] Migrate learn workflow path contract to concept directories (`.gpd/learning/{slug}/...`)
+- [x] Add automatic move-in-place migration from legacy flat files
+- [x] Add concept memory contract (`MEMORY.json`) and update policy
+- [x] Add prerequisite graph contract (`concept-prereqs.json`) and soft-gate routing logic
+- [x] Align `gpd:learn` success criteria with new session/memory paths
+- [x] Align `gpd-tutor` and `gpd-mastery-assessor` output file paths
+- [x] Add prompt-wiring regression test for learn memory/prereq contracts
 - [x] Run targeted tests and lint checks
 
 ## Review
 
-- Targeted tests: `uv run pytest tests/test_cli_commands.py -k "command_context_learn" -v` (passed)
-- Lint: `uv run ruff check tests/test_cli_commands.py` (passed)
-- Full prompt-wiring suite has pre-existing repo graph inventory mismatches unrelated to this change:
+- Prompt contract test: `uv run pytest tests/core/test_prompt_wiring.py -k "learn_workflow_uses_concept_directory_memory_and_prereq_soft_gate" -v` (passed)
+- CLI context tests: `uv run pytest tests/test_cli_commands.py -k "command_context_learn" -v` (passed)
+- Lint: `uv run ruff check tests/core/test_prompt_wiring.py tests/test_cli_commands.py` (passed)
+- Full prompt-wiring suite still has pre-existing repo graph inventory mismatches unrelated to this branch:
   - `test_repo_graph_prompt_scope_counts_match_repo_inventory`
   - `test_repo_graph_same_stem_command_inventory_matches_repo`
