@@ -130,3 +130,60 @@
 **Changes**: No code changes — analysis only
 **Verification**: Key improvements confirmed in practice: (1) MCP calls ~100ms vs manual file I/O in workflow, (2) 45 automated tests vs 0, (3) Bjork state tracking active (storage_strength updated after assessment), (4) FSRS card ready to initialize on mastery, (5) schema migration v1→v2 working on-read, (6) explanation caching eliminates repeat 4-min agent spawns
 **Notes**: Remaining gaps: agent spawn latency still 10-100s (inherent), FSRS review loop not yet tested e2e (need Level 3 mastery), `npx --local` install flow has rough edges (manual pip install needed).
+
+### [2026-03-17 18:44 UTC] Reached Level 3 mastery — FSRS card initialized end-to-end
+**Why**: Needed to verify the full loop including FSRS card creation on mastery, which was the last untested piece.
+**Status**: ✅ Complete
+**Changes**: `.gpd/learning/unitary-time-evolution/MEMORY.json` — fsrs field populated with stability, difficulty, next_review
+**Verification**: Recall challenge → Level 3 UNDERSTANDING → `end_session(status="mastered")` → `fsrs_initialized: true`, `next_review: 2026-03-19T18:44:59`
+**Notes**: Discovered FSRS bug — single Good review left card in Learning state (10-min interval). Fixed with two Good reviews to graduate to Review state (2-day interval). Fix committed to main (`8570b6d`).
+
+### [2026-03-17 18:52 UTC] External critique review — honest assessment of v0 sophistication
+**Why**: Evaluate what's genuinely sophisticated vs what's simple/delegated to LLM prompts.
+**Status**: ✅ Complete (analysis only)
+**Changes**: No code changes
+**Verification**: Critique is accurate. See notes below.
+**Notes**: Agreed gaps for v1+: (1) no BKT for probabilistic mastery, (2) no stepwise feedback, (3) adaptive policy is a simple rule tree not a learned model, (4) Bjork parameters are hardcoded not calibrated, (5) no cross-concept learner model.
+
+### [2026-03-17 19:00 UTC] Fixed FSRS card init — two Good reviews to graduate to Review state
+**Why**: Single Good review left card in Learning state with 10-minute interval; mastery-loop concepts need days-scale intervals.
+**Status**: ✅ Complete
+**Changes**:
+- Modified `src/gpd/core/learning.py` — `init_fsrs_card()` now does two Good reviews (Learning → Review)
+- Modified `tests/mcp/test_learning_server.py` — updated test to check reps=2, state=2, hours>12
+- Fixed existing MEMORY.json for unitary-time-evolution (next_review: 2026-03-19)
+**Verification**: 45/45 tests pass, card state=2 (Review), next review 2 days out. Committed to main (`8570b6d`).
+
+### [2026-03-17 19:05 UTC] Added review-due indicator to statusline
+**Why**: FSRS scheduling is useless without notifications — user needs to know when concepts are due.
+**Status**: ✅ Complete
+**Changes**:
+- Modified `.claude/hooks/statusline.py` — added `_review_due_count()` that reads MEMORY.json FSRS cards directly (no MCP dependency), shows "N due for review" in yellow
+**Verification**: Tested with `echo '{"model":"claude-opus-4-6","workspace":"..."}' | python statusline.py` — no indicator shown (correct, next review Mar 19). Committed to main (`623cf2d`).
+
+### [2026-03-17 19:10 UTC] Added copy-pasteable prerequisite commands to explanation output
+**Why**: User reading an explanation with shaky prereqs needs a low-friction way to drill into them.
+**Status**: ✅ Complete
+**Changes**:
+- Modified `src/gpd/specs/workflows/explain.md` — explainer requirement 3 now includes copy-pasteable `/gpd:explain` and `/gpd:learn` commands for each prerequisite
+**Verification**: Committed to main (`0ae87ea`). Next explanation invocation will include the prereq commands section.
+
+### [2026-03-17 19:15 UTC] PR #3 merged + README updated on main
+**Why**: Ship the gpd-learning MCP server to main.
+**Status**: ✅ Complete
+**Changes**:
+- PR #3 merged (5 commits: core engine, MCP server, workflow refactor, caching, progress log)
+- README.md updated with FSRS-6, Bjork, `--review` flag, explanation caching, MCP server mention
+- Cherry-picked README commit to main after merge (`c7bf321`)
+**Verification**: `git log origin/main` shows all commits merged. README has FSRS/Bjork sections.
+
+### [2026-03-17 20:16 UTC] Learning loop tests — entropy and classical thermodynamics
+**Why**: Test the full learning workflow on new concepts, including explanation-first offer and prerequisite navigation.
+**Status**: ✅ Complete
+**Changes**:
+- Created `.gpd/learning/entropy/` — session started, explanation-first chosen
+- Created `.gpd/explanations/entropy-EXPLAIN.md` — full explanation cached
+- Created `.gpd/learning/classical-thermodynamics/` — recall challenge, Level 1, 5 gaps identified, paused
+- Created `.gpd/explanations/classical-thermodynamics-EXPLAIN.md` — full explanation for gap study
+**Verification**: New concept flow works: fresh session → explanation-first offer → explanation cached → challenge → assessment → gaps → pause → `/gpd:explain` for study. Cross-concept navigation (entropy → classical thermo prereq) works via copy-paste commands.
+**Notes**: Hit API 500 errors during classical thermo explanation (transient, resolved on retry). Entropy session still active (paused before challenge, explanation delivered).
